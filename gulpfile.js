@@ -1,129 +1,157 @@
-/*=============================================
-=            Gulp Starter by @dope            =
-=============================================*/
+var gulp                   = require('gulp');
+var del                    = require('del');
+var uglify                 = require('gulp-uglify');
+var cleanCss               = require('gulp-clean-css');
+var stylus                 = require('gulp-stylus');
+var rev                    = require('gulp-rev');
+var revCollector           = require('gulp-rev-collector');
+var sourcemaps             = require('gulp-sourcemaps');
+var autoprefixer           = require('gulp-autoprefixer');
+var concat                 = require('gulp-concat');
+var imagemin               = require('gulp-imagemin');
+var imageminJpegRecompress = require('imagemin-jpeg-recompress');
+var imageminOptipng        = require('imagemin-optipng');
+var browserSync            = require('browser-sync').create();
+var gulpSequence           = require('gulp-sequence');
 
-/**
-*
-* The packages we are using
-* Not using gulp-load-plugins as it is nice to see whats here.
-*
-**/
-var gulp         = require('gulp');
-var path         = require('path');
-var sass         = require('gulp-sass');
-var browserSync  = require('browser-sync');
-var prefix       = require('gulp-autoprefixer');
-var concat       = require('gulp-concat');
-var minifyCss    = require('gulp-minify-css');
-var plumber      = require('gulp-plumber');
-var uglify       = require('gulp-uglify');
-var rename       = require("gulp-rename");
-var imagemin     = require("gulp-imagemin");
-var pngquant     = require('imagemin-pngquant');
-var rev          = require('gulp-rev-append');
+//设置各种输入输出文件夹的位置;
+var srcScript = './src/js/*.js',
+    dstScript = './dist/js',
+    srcCss = './src/css/*.css',
+    dstCss = './dist/css',
+    srcStylus = './src/stylus/*.styl',
+    dstStylus = './dist/css',
+    srcImage = './src/img/*.*',
+    dstImage = './dist/img',
+    srcHtml = './src/*.html',
+    dstHtml = './',
+    srcRev = './rev/*.json',
+    dstRev = './rev';
 
-var config = {
-  src: 'src/',
-  dest: './',
-};
-var s = function(file_path){
-  return path.join(config.src, file_path);
-};
-var d = function(file_path){
-  return path.join(config.dest, file_path);
-};
-/**
-*  concat common css, 
-*/
-gulp.task('css', function(){
-  gulp.src([s('css/normalize.css'), s('css/main.css')])
-  .pipe(concat('common.css'))
-  .pipe(minifyCss())
-  .pipe(gulp.dest(d('css')));
-});
-/**
-*
-* Styles
-* - Compile
-* - Compress/Minify
-* - Catch errors (gulp-plumber)
-* - Autoprefixer
-*
-**/
-gulp.task('sass', function() {
-  gulp.src(s('sass/**/*.sass'))
-  .pipe(sass({outputStyle: 'compressed'}))
-  .pipe(prefix('last 2 versions', '> 1%', 'ie 8', 'Android 2', 'Firefox ESR'))
-  .pipe(plumber())
-  .pipe(gulp.dest(d('css')));
+gulp.task('clean', function(){
+  return del(['./dist', './rev'])
+})
+
+//处理JS文件:压缩;
+//命令行使用gulp script启用此任务;
+gulp.task('script', function() {
+  return (
+    gulp.src(srcScript)
+      .pipe(sourcemaps.init())
+      .pipe(uglify())
+      .pipe(sourcemaps.write())
+      .pipe(rev())
+      .pipe(gulp.dest(dstScript))
+      .pipe(rev.manifest('js.json'))
+      .pipe(gulp.dest(dstRev))
+  )
 });
 
-/**
-*
-* BrowserSync.io
-* - Watch CSS, JS & HTML for changes
-* - View project at: localhost:3000
-*
-**/
-gulp.task('browser-sync', function() {
-  browserSync.init([s('css/*.css'), s('js/**/*.js'), s('index.html')], {
-    server: {
-      baseDir: './'
-    },
-    port: 8080
+//处理CSS文件:压缩;
+//命令行使用gulp css启用此任务;
+gulp.task('css', function() {
+  return (
+    gulp.src(srcCss)
+      .pipe(concat('base.css'))
+      .pipe(autoprefixer('last 2 versions', '> 1%', 'ie 8', 'Android 2', 'Firefox ESR'))
+      .pipe(cleanCss({compatibility:'ie8'}))
+      .pipe(rev())
+      .pipe(gulp.dest(dstCss))
+      .pipe(rev.manifest('css.json'))
+      .pipe(gulp.dest(dstRev))
+  )
+});
+
+//STYLUS文件输出CSS,天生自带压缩特效;
+//命令行使用gulp stylus启用此任务;
+
+gulp.task('stylus', function() {
+  return (
+    gulp.src(srcStylus)
+      .pipe(sourcemaps.init())
+      .pipe(stylus({compress: true}))
+      .pipe(autoprefixer('last 2 versions', '> 1%', 'ie 8', 'Android 2', 'Firefox ESR'))
+      .pipe(sourcemaps.write())
+      .pipe(rev())
+      .pipe(gulp.dest(dstStylus))
+      .pipe(rev.manifest('stylus.json'))
+      .pipe(gulp.dest(dstRev))
+  )
+});
+
+//图片压缩任务,支持JPEG、PNG及GIF文件;
+//命令行使用gulp jpgmin启用此任务;
+gulp.task('imgmin', function() {
+  var jpgmin = imageminJpegRecompress({
+      accurate: true,//高精度模式
+      quality: "high",//图像质量:low, medium, high and veryhigh;
+      method: "smallfry",//网格优化:mpe, ssim, ms-ssim and smallfry;
+      min: 70,//最低质量
+      loops: 0,//循环尝试次数, 默认为6;
+      progressive: false,//基线优化
+      subsample: "default"//子采样:default, disable;
+    }),
+    pngmin = imageminOptipng({
+      optimizationLevel: 4
+    });
+    return (
+      gulp.src(srcImage)
+        .pipe(imagemin({
+          use: [jpgmin, pngmin]
+        }))
+        .pipe(gulp.dest(dstImage))
+    )
+});
+
+//把所有html页面扔进dist文件夹(不作处理);
+//命令行使用gulp html启用此任务;
+gulp.task('html', function() {
+  return (
+    gulp.src(srcHtml)
+      .pipe(gulp.dest(dstHtml))
+  )
+});
+
+
+//服务器任务:以当前文件夹为基础,启动服务器;
+//命令行使用gulp server启用此任务;
+gulp.task('server', function() {
+  browserSync.init({
+    server: "./",
+    port: 8080,
+    ui: {port: 8081},
+    open: false,
+    reloadOnRestart: true,
   });
 });
 
-
-/**
-*
-* Javascript
-* - Uglify
-*
-**/
-gulp.task('scripts', function() {
-  gulp.src(s('js/*.js'))
-  .pipe(uglify())
-  .pipe(rename({
-    // dirname: "min",
-    suffix: ".min",
-  }))
-  .pipe(gulp.dest(d('js')));
-});
-
-/**
-*
-* Images
-* - Compress them!
-*
-**/
-gulp.task('images', function () {
-  return gulp.src(s('images/*'))
-  .pipe(imagemin({
-    progressive: true,
-    svgoPlugins: [{removeViewBox: false}],
-    use: [pngquant()]
-  }))
-  .pipe(gulp.dest(d('images')));
-});
-
-
-/**
-*
-* Default task
-* - Runs sass, browser-sync, scripts and image tasks
-* - Watchs for file changes for images, scripts and sass/css
-*
-**/
-gulp.task('default', ['css', 'sass', 'browser-sync', 'scripts', 'images'], function () {
-  gulp.watch(s('sass/**/*.sass'), ['sass']);
-  gulp.watch(s('js/**/*.js'), ['scripts']);
-  gulp.watch(s('images/*'), ['images']);
-  gulp.watch(s('css/*.css'), ['css']);
-});
-
+//给js, css加入版本号
+//命令行使用gulp rev启用此任务;
 gulp.task('rev', function() {
-  gulp.src('./index.html')
-    .pipe(rev())
-    .pipe(gulp.dest('.'));
+  return (
+    gulp.src([srcRev, srcHtml])   //- 读取 rev-manifest.json 文件以及需要进行js, css名替换的html文件
+      .pipe(revCollector())
+      .pipe(gulp.dest(dstHtml))
+  )
 });
+
+//监控改动并自动刷新任务;
+//命令行使用gulp auto启动;
+gulp.task('auto', function() {
+  gulp.watch(srcScript, ['script']);
+  gulp.watch(srcCss, ['css']);
+  gulp.watch(srcStylus, ['stylus']);
+  gulp.watch(srcImage, ['imgmin']);
+  gulp.watch(srcHtml, ['html']);
+  gulp.watch(srcRev, ['rev']);
+  gulp.watch('./dist/**/*.*').on('change', browserSync.reload);
+});
+
+//gulp默认任务(集体走一遍,然后开监控);
+gulp.task('default', gulpSequence(
+  'clean', ['script', 'css', 'stylus', 'imgmin', 'html', 'server'], 'rev', 'auto'
+));
+//发布
+gulp.task('deploy', gulpSequence(
+  'clean', ['script', 'css', 'stylus', 'imgmin', 'html'], 'rev'
+));

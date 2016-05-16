@@ -2,7 +2,7 @@ var gulp         = require('gulp');
 var del          = require('del');
 var fs           = require('fs');
 var path         = require('path');
-var taskname     = require('yargs').argv._[0];
+var argv         = require('yargs').argv;
 var gulpif       = require('gulp-if');
 var uglify       = require('gulp-uglify');
 var cleanCss     = require('gulp-clean-css');
@@ -29,7 +29,7 @@ var gutil        = require('gulp-util');
 var tap          = require('gulp-tap');
 var buffer       = require('gulp-buffer');
 
-var DEV = taskname != 'deploy'; //是否测试环境
+var DEV = argv._[0] != 'deploy' || !argv.d; //是否测试环境
 
 //设置各种输入输出文件夹的位置;
 var srcScript = './js/*.js',
@@ -214,9 +214,9 @@ gulp.task('watch', function() {
 
 //gulp默认任务(集体走一遍,然后开监控);
 gulp.task('default', gulpSequence(
-  'clean', 'sprite', ['script', 'stylus', 'imgmin', 'html'], 'server', 'watch'
+  'clean', 'sprite', 'imgmin', ['script', 'stylus'], 'html', 'server', 'watch'
 ));
 gulp.task('deploy', gulpSequence(
-  'sprite', ['script', 'stylus', 'imgmin'], 'html', 'rev:img'
+  'sprite', 'imgmin', ['script', 'stylus'], 'html', 'rev:img'
 ));
 
